@@ -49,7 +49,7 @@ function cableCurve(seed: number, top: THREE.Vector3, bottom: THREE.Vector3, bul
   return new THREE.CatmullRomCurve3(pts);
 }
 
-export function Overseer() {
+export function Overseer({ menu = false }: { menu?: boolean }) {
   const root = useRef<THREE.Group>(null!);
   const body = useRef<THREE.Group>(null!);
   const legL = useRef<THREE.Group>(null!);
@@ -103,8 +103,37 @@ export function Overseer() {
   }, [tex]);
 
   useFrame((st, dt) => {
-    const m = game.monster;
     const t = st.clock.elapsedTime;
+    if (menu) {
+      // Main menu: stand still, peek around the wall and follow the cursor.
+      const px = st.pointer.x;
+      const py = st.pointer.y;
+      body.current.rotation.x = 0.12 + Math.sin(t * 0.8) * 0.02;
+      body.current.rotation.z = -0.22 + Math.sin(t * 0.5) * 0.03;
+      body.current.position.y = Math.sin(t * 1.6) * 0.02;
+      head.current.rotation.y += (px * 0.7 - head.current.rotation.y) * Math.min(1, dt * 3);
+      head.current.rotation.x += (-py * 0.35 - head.current.rotation.x) * Math.min(1, dt * 3);
+      head.current.rotation.z = 0.25 + Math.sin(t * 0.37) * 0.08;
+      armL.current.rotation.x = -0.2 + Math.sin(t * 1.3) * 0.05;
+      armR.current.rotation.x = -1.1 + Math.sin(t * 1.1) * 0.06;
+      armR.current.rotation.z = 0.5;
+      const u = res.screen.uniforms;
+      u.uTime.value = t;
+      const glare = Math.max(0, 1 - Math.hypot(px, py) * 1.4);
+      u.uMode.value += (glare - u.uMode.value) * Math.min(1, dt * 2);
+      u.uPower.value = Math.random() < 0.03 ? 0.25 : 1;
+      cone.current.visible = false;
+      return;
+    }
+    const m = game.monster;
+    if (m.dead) {
+      root.current.position.set(m.x, 0, m.z);
+      body.current.rotation.x += (1.45 - body.current.rotation.x) * Math.min(1, dt * 2);
+      body.current.position.y += (-1.2 - body.current.position.y) * Math.min(1, dt * 2);
+      res.screen.uniforms.uPower.value = 0.02;
+      cone.current.visible = false;
+      return;
+    }
     root.current.position.set(m.x, 0, m.z);
     // The model is built facing +Z, while sim yaw points along -Z — flip it so it walks face-first.
     root.current.rotation.y = m.yaw + Math.PI;

@@ -1,5 +1,5 @@
 import { useFrame } from "@react-three/fiber";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import * as THREE from "three";
 import { game } from "../sim/game";
 import type { ItemKind } from "../sim/map";
@@ -242,6 +242,15 @@ function Pickup({ id }: { id: number }) {
 }
 
 export function Items() {
+  // Events can drop new pickups mid-shift; re-render when the list grows.
+  const [, setN] = useState(game.pickups.length);
+  const seen = useRef(game.pickups.length);
+  useFrame(() => {
+    if (game.pickups.length !== seen.current) {
+      seen.current = game.pickups.length;
+      setN(seen.current);
+    }
+  });
   return (
     <group>
       {game.pickups.map((p) => (
