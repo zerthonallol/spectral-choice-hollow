@@ -13,23 +13,32 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
+      - name: Set up Node.js (v22)
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          # Удалили cache: 'npm', чтобы не требовался package-lock.json
+          node-version: 22
 
       - name: Install dependencies
-        run: npm install  # Используем npm install вместо npm ci
+        run: npm install
 
       - name: Build Web app
         run: npm run build
 
-      - name: Setup & Add Capacitor Android
+      - name: Create Capacitor Config
         run: |
-          npx cap init "Spectral Choice Hollow" "com.spectral.hollow" --web-dir dist || true
+          echo '{
+            "appId": "com.spectral.hollow",
+            "appName": "Spectral Choice Hollow",
+            "webDir": "dist"
+          }' > capacitor.config.json
+
+      - name: Install Capacitor packages
+        run: |
           npm install @capacitor/core @capacitor/cli @capacitor/android
-          npx cap add android || true
+
+      - name: Add Android Platform with Capacitor
+        run: |
+          npx cap add android
           npx cap copy android
           npx cap sync android
 
