@@ -1,0 +1,92 @@
+name: Build Windows EXE
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-win:
+    runs-on: windows-latest  # Собираем прямо на виртуальной машине Windows, чтобы Electron собрался без ошибок
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Ensure index.html exists
+        run: |
+          if (-not (Test-Path "index.html")) {
+            '<!doctype html><html lang="en"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>App</title></head><body><div id="root"></div><script type="module" src="/src/main.tsx"></script></body></html>' | Out-File -Encoding utf8 index.html
+          }
+
+      - name: Build Web App
+        run: npm run build
+
+      - name: Install Electron & Electron Builder
+        run: npm install electron electron-builder --save-dev
+
+      - name: Create Electron Main File (main.js)
+        run: |
+          $mainJs = @"
+          const { app, BrowserWindow } = require('electron');
+          const path = require('path');
+
+          function createWindow() {
+            const win = new BrowserWindow({
+              width: 1280,
+              height: 720,
+              webPreferences: {
+                nodeIntegration: true,
+                contextIsolation: false
+              }
+            });
+
+            // Загружаем собранный Vite-проект
+            win.loadFile(path.join(__dirname, 'dist/index.html'));
+          }
+
+          app.whenReady().then(() => {
+            createWindow();
+            app.on('activate', () => {
+              if (BrowserWindow.getAllWindows().length === 0) createWindow();
+            });
+          });
+
+          app.on('window-all-closed', () => {
+            if (process.platform !== 'darwin') app.quit();
+          });
+          "@
+          Set-Content -Path main.js -Value $mainJs
+
+      - name: Add Electron Config to package.json
+        run: |
+          $pkgPath = "package.json"
+          $json = Get-Content $pkgPath -Raw | ConvertFrom-Json
+          $json.main = "main.js"
+          
+          # Добавляем настройки билда в package.json
+          if (-not $json.build) { $json | Add-Member -NotePropertyName "build" -NotePropertyValue @{
+            appId = "com.spectral.hollow.desktop"
+            productName = "Spectral Choice Hollow"
+            directories = @{ output = "release" }
+            win = @{ target = @("nsis") }
+          } }
+          
+          $json | ConvertTo-Json -Depth 10 | Set-Content $pkgPath
+
+      - name: Build Windows EXE with Electron-Builder
+        run: npx electron-builder --win
+
+      - name: Upload EXE Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Spectral-Choice-Hollow-Windows-EXE
+          path: release/*.exe
