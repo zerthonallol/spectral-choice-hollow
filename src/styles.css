@@ -51,6 +51,10 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
+  --color-hud: var(--hud);
+  --color-hud-dim: var(--hud-dim);
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --font-display: "Oswald", "IBM Plex Mono", sans-serif;
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -62,26 +66,31 @@
 }
 
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.129 0.042 264.695);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.129 0.042 264.695);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.129 0.042 264.695);
-  --primary: oklch(0.208 0.042 265.755);
-  --primary-foreground: oklch(0.984 0.003 247.858);
-  --secondary: oklch(0.968 0.007 247.896);
-  --secondary-foreground: oklch(0.208 0.042 265.755);
-  --muted: oklch(0.968 0.007 247.896);
-  --muted-foreground: oklch(0.554 0.046 257.417);
-  --accent: oklch(0.968 0.007 247.896);
-  --accent-foreground: oklch(0.208 0.042 265.755);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.984 0.003 247.858);
-  --border: oklch(0.929 0.013 255.508);
-  --input: oklch(0.929 0.013 255.508);
-  --ring: oklch(0.704 0.04 256.788);
+  --radius: 0.125rem;
+  --background: oklch(0.12 0.008 60);
+  --foreground: oklch(0.88 0.04 80);
+  --card: oklch(0.16 0.01 60);
+  --card-foreground: oklch(0.88 0.04 80);
+  --popover: oklch(0.16 0.01 60);
+  --popover-foreground: oklch(0.88 0.04 80);
+  --primary: oklch(0.78 0.15 70);
+  --primary-foreground: oklch(0.14 0.01 60);
+  --secondary: oklch(0.22 0.012 60);
+  --secondary-foreground: oklch(0.88 0.04 80);
+  --muted: oklch(0.22 0.012 60);
+  --muted-foreground: oklch(0.62 0.03 75);
+  --accent: oklch(0.3 0.04 65);
+  --accent-foreground: oklch(0.92 0.05 80);
+  --destructive: oklch(0.6 0.2 27);
+  --destructive-foreground: oklch(0.96 0.01 80);
+  --border: oklch(0.78 0.15 70 / 35%);
+  --input: oklch(0.3 0.02 60);
+  --ring: oklch(0.78 0.15 70);
+  --hud: oklch(0.88 0.06 80);
+  --hud-dim: oklch(0.66 0.04 75);
+  --health: oklch(0.58 0.2 27);
+  --sanity: oklch(0.68 0.12 200);
+  --battery: oklch(0.8 0.15 85);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -142,3 +151,63 @@
     color: var(--color-foreground);
   }
 }
+
+@layer components {
+  .hud-bar { height: 6px; background: oklch(0 0 0 / 55%); border: 1px solid var(--border); }
+  .hud-bar-fill { height: 100%; transition: width 0.2s; }
+  .hud-bar-health { background: var(--health); box-shadow: 0 0 8px var(--health); }
+  .hud-bar-sanity { background: var(--sanity); box-shadow: 0 0 8px var(--sanity); }
+  .hud-bar-battery { background: var(--battery); box-shadow: 0 0 8px var(--battery); }
+  .hud-chip { display: inline-flex; gap: 0.5rem; align-items: center; padding: 0.25rem 0.6rem; font-size: 0.8rem;
+    background: oklch(0 0 0 / 60%); border: 1px solid var(--border); color: var(--hud); }
+  .hud-chip-warn { color: var(--hud-dim); border-color: oklch(0.6 0.2 27 / 50%); }
+  .hud-key { padding: 0 0.35rem; background: var(--primary); color: var(--primary-foreground); font-weight: 700; }
+  .hud-msg { padding: 0.15rem 0.6rem; background: oklch(0 0 0 / 55%); text-shadow: 0 0 6px oklch(0.78 0.15 70 / 50%); animation: hud-in 0.3s ease-out; }
+  .hud-alert { padding: 0.2rem 0.6rem; color: var(--destructive-foreground); background: oklch(0.6 0.2 27 / 70%); font-weight: 700; animation: pulse 1s infinite; }
+  .hud-slot { position: relative; overflow: hidden; width: 3.1rem; height: 3.1rem; display: grid; place-items: center;
+    background: oklch(0 0 0 / 60%); border: 1px solid oklch(0.78 0.15 70 / 22%); color: var(--hud); }
+  .hud-slot-active { border-color: var(--primary); box-shadow: 0 0 12px oklch(0.78 0.15 70 / 45%), inset 0 0 10px oklch(0.78 0.15 70 / 20%); }
+  .hud-btn { padding: 0.5rem 0.9rem; border: 1px solid var(--border); background: oklch(0 0 0 / 55%); color: var(--hud);
+    text-transform: uppercase; letter-spacing: 0.12em; font-size: 0.75rem; transition: background 0.15s, border-color 0.15s; }
+  .hud-btn:hover { background: var(--accent); border-color: var(--primary); }
+  .hud-btn-primary { padding: 0.7rem 1rem; background: var(--primary); color: var(--primary-foreground); font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.18em; font-size: 0.8rem; box-shadow: 0 0 24px oklch(0.78 0.15 70 / 35%); }
+  .hud-btn-primary:hover { filter: brightness(1.1); }
+  .hud-panel { padding: 1rem; background: oklch(0.1 0.008 60 / 92%); border: 1px solid var(--border); color: var(--hud); }
+  .hud-panel input[type="range"] { accent-color: var(--primary); }
+  .hud-panel input[type="checkbox"] { accent-color: var(--primary); }
+  .hud-screen { background: radial-gradient(ellipse at center, oklch(0.14 0.015 60 / 80%), oklch(0.05 0.005 60 / 96%)); color: var(--hud); }
+  .hud-title { font-family: var(--font-display); font-size: clamp(2.4rem, 7vw, 5rem); letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--primary); text-shadow: 0 0 30px oklch(0.78 0.15 70 / 45%); line-height: 1; text-align: center; }
+  .hud-flicker { animation: flicker 5s infinite; }
+  .crt-overlay { position: absolute; inset: 0; pointer-events: none;
+    background: repeating-linear-gradient(to bottom, oklch(0 0 0 / 0%) 0px, oklch(0 0 0 / 0%) 2px, oklch(0 0 0 / 22%) 3px);
+    mix-blend-mode: multiply; }
+  .hallucination { position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(ellipse at center, transparent 35%, oklch(0.35 0.15 27 / 55%) 100%); animation: pulse 1.4s infinite; }
+  .tape-reels { display: flex; gap: 2.5rem; justify-content: center; }
+  .tape-reels span { width: 2.6rem; height: 2.6rem; border-radius: 9999px; border: 3px dashed var(--primary); }
+  .tape-reels-on span { animation: spin 2s linear infinite; }
+  .touch-joy { border-radius: 9999px; border: 2px solid var(--border); background: oklch(0 0 0 / 30%); }
+  .touch-knob { position: absolute; left: 50%; top: 50%; width: 3.2rem; height: 3.2rem; border-radius: 9999px;
+    background: oklch(0.78 0.15 70 / 45%); border: 2px solid var(--primary); }
+  .touch-btn { min-width: 4.5rem; padding: 0.7rem 0.5rem; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em;
+    background: oklch(0 0 0 / 50%); border: 1px solid var(--border); color: var(--hud); }
+  .touch-btn-on { background: oklch(0.78 0.15 70 / 40%); border-color: var(--primary); }
+}
+@layer components {
+  .menu-shade { pointer-events: none;
+    background: linear-gradient(90deg, oklch(0.04 0.005 60 / 92%) 0%, oklch(0.05 0.005 60 / 70%) 38%, oklch(0 0 0 / 0%) 70%),
+      radial-gradient(ellipse at 70% 50%, oklch(0 0 0 / 0%) 30%, oklch(0.03 0 0 / 70%) 100%); }
+  .menu-title { font-family: var(--font-display); font-size: clamp(3rem, 9vw, 6.5rem); letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--primary); line-height: 0.9; text-shadow: 0 0 40px oklch(0.78 0.15 70 / 45%); }
+  .menu-rise { opacity: 0; animation: menu-rise 0.9s cubic-bezier(.2,.7,.2,1) forwards; }
+  .menu-fade-in { animation: menu-fade 2.4s ease-out both; }
+  .menu-item { text-align: left; transition: transform 0.2s ease, letter-spacing 0.2s ease, filter 0.2s; }
+  .menu-item:hover { transform: translateX(8px); letter-spacing: 0.04em; }
+  .tutorial-card { animation: hud-in 0.4s ease-out both; border-color: var(--primary); }
+}
+@keyframes menu-rise { from { opacity: 0; transform: translateY(14px); filter: blur(4px); } to { opacity: 1; transform: none; filter: none; } }
+@keyframes menu-fade { 0% { opacity: 0; } 30% { opacity: 0.2; } 34% { opacity: 0; } 40% { opacity: 0.6; } 100% { opacity: 1; } }
+@keyframes hud-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes flicker { 0%, 92%, 100% { opacity: 1; } 93% { opacity: 0.3; } 94% { opacity: 1; } 96% { opacity: 0.5; } 97% { opacity: 1; } }

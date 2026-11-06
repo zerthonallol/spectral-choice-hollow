@@ -28,3 +28,7 @@ use the editor.
   own key and store it in Secrets.
 - **Secrets.** Lovable manages them. Do not put secret values in the repo.
 <!-- LOVABLE:END -->
+
+## Game structure
+- Game rules (items, endings, random events, tutorial) live in `src/game/sim/game.ts` as plain TS with vitest coverage; scenes only read state — keeps rules testable without WebGL.
+- The main menu renders its own small scene (`MenuScene`) and the tunnel canvas is paused (`frameloop="never"`) while the menu is open — avoids two active renderers on weak devices.

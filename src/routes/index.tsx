@@ -1,23 +1,35 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import { game } from "@/game/sim/game";
+import { GameCanvas } from "@/game/GameCanvas";
+import { Hud } from "@/game/Hud";
 
-// The home route ships no og:image, so serve-time hosting can inject the
-// project's social preview (explicit og:image or latest screenshot).
 export const Route = createFileRoute("/")({
+  ssr: false,
+  head: () => ({
+    meta: [
+      { title: "Световой Код — 3D-хоррор в коллекторе" },
+      { name: "description", content: "Выживите в тёмных туннелях коллектора: свет, фонарь и рассудок против Надсмотрщика. Семь концовок." },
+      { property: "og:title", content: "Световой Код — 3D-хоррор" },
+      { property: "og:description", content: "Свет — единственное, что держит Надсмотрщика на расстоянии. Браузерный хоррор от первого лица." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
+    ],
+  }),
   component: Index,
 });
 
-// IMPORTANT: Replace this placeholder. See ./README.md for routing conventions.
 function Index() {
+  // Pause the tunnel renderer while the menu (with its own scene) is open.
+  const [inMenu, setInMenu] = useState(true);
+  useEffect(() => {
+    const id = window.setInterval(() => setInMenu(game.phase === "menu"), 200);
+    return () => window.clearInterval(id);
+  }, []);
   return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
-      />
+    <div data-game-root className="fixed inset-0 overflow-hidden bg-background">
+      <GameCanvas active={!inMenu} />
+      <Hud />
     </div>
   );
 }
