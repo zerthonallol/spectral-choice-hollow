@@ -131,6 +131,39 @@ export function ItemModel({ kind }: { kind: ItemKind }) {
           <Std color="#e8d79a" rough={0.8} emissive="#5a4a10" ei={0.6} />
         </mesh>
       );
+    case "pepper":
+      return (
+        <group>
+          <mesh castShadow>
+            <cylinderGeometry args={[0.035, 0.035, 0.16, 10]} />
+            <Std color="#c9c1b0" metal={0.6} rough={0.4} />
+          </mesh>
+          <mesh position={[0, 0.1, 0]}>
+            <cylinderGeometry args={[0.036, 0.036, 0.05, 10]} />
+            <Std color="#b3170f" rough={0.5} />
+          </mesh>
+        </group>
+      );
+    case "pistol":
+      return (
+        <group rotation={[0, 0.4, 0]}>
+          <mesh castShadow position={[0, 0.03, 0]}>
+            <boxGeometry args={[0.04, 0.05, 0.2]} />
+            <Std color="#2a2826" metal={0.85} rough={0.35} />
+          </mesh>
+          <mesh castShadow position={[0, -0.04, 0.06]} rotation={[0.25, 0, 0]}>
+            <boxGeometry args={[0.035, 0.11, 0.05]} />
+            <Std color="#4a2418" rough={0.7} />
+          </mesh>
+        </group>
+      );
+    case "ammo":
+      return (
+        <mesh castShadow>
+          <boxGeometry args={[0.12, 0.05, 0.08]} />
+          <Std color="#9a2a1c" rough={0.85} emissive="#2a0a05" />
+        </mesh>
+      );
     case "shard":
       return (
         <mesh castShadow scale={[0.8, 1.6, 0.35]}>

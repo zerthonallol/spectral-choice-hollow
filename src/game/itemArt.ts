@@ -9,7 +9,10 @@ import shard from "@/assets/items/shard.jpg";
 import card from "@/assets/items/card.jpg";
 import tape from "@/assets/items/tape.jpg";
 import battery from "@/assets/items/battery.jpg";
+import pepper from "@/assets/items/pepper.jpg";
+import pistol from "@/assets/items/pistol.jpg";
+import ammo from "@/assets/items/ammo.jpg";
 
 export const ITEM_ART: Partial<Record<ItemKind, string>> = {
-  wrench, stungun, redFlare, whiteFlare, cortexin, bandage, shard, card, tape, battery,
+  wrench, stungun, redFlare, whiteFlare, cortexin, bandage, shard, card, tape, battery, pepper, pistol, ammo,
 };

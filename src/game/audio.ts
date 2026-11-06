@@ -249,6 +249,16 @@ class AudioEngine {
         case "alarm":
           this.play("boom", 1, 0, e.type === "alarm" ? 1.6 : 1);
           break;
+        case "shot":
+          this.play("boom", 0.9, 0, 2.4);
+          this.play("hit", 0.6, 0, 1.6);
+          break;
+        case "spray":
+          this.play("zap", 0.25, 0, 0.35);
+          break;
+        case "event":
+          this.play(e.name === "radio" ? "terminal" : "clunk", 0.7, 0, e.name === "pipe" ? 0.6 : 1);
+          break;
         case "inject":
         case "reflect":
           this.play("pickup", 0.5, 0, 0.6);
