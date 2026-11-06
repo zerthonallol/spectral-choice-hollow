@@ -21,21 +21,31 @@ jobs:
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
-      - name: Build Lovable Web App (Vite)
+      - name: Create index.html for Vite (Lovable fix)
         run: |
-          # Сборка Vite напрямую в обход tsc (чтобы игнорировать ошибки типов Lovable)
-          npx vite build || npm run build || true
-
-      - name: Check and Prepare Build Directory
-        run: |
-          # Проверяем появление папки dist
-          if [ ! -d "dist" ] || [ ! -f "dist/index.html" ]; then
-            echo "dist directory missing or incomplete, creating dist from root index.html..."
-            mkdir -p dist
-            cp index.html dist/ 2>/dev/null || true
-            cp -r src dist/ 2>/dev/null || true
-            cp -r public/* dist/ 2>/dev/null || true
+          # Если index.html отсутствует или пустой, создаем его для корректной сборки Vite
+          if [ ! -f "index.html" ] || ! grep -q "root" index.html; then
+            echo "Creating standard Vite index.html for Lovable project..."
+            cat << 'EOF' > index.html
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Spectral Choice Hollow</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+EOF
           fi
+
+      - name: Build Web App (Vite)
+        run: |
+          # Запускаем сборку Vite, которая сгенерирует папку dist из компонентов src
+          npm run build || npx vite build
 
       - name: Create Capacitor Config
         run: |
@@ -48,13 +58,14 @@ jobs:
             }
           }' > capacitor.config.json
 
-      - name: Install Capacitor
+      - name: Install Capacitor Core & CLI
         run: |
           npm install @capacitor/core @capacitor/cli @capacitor/android --save-dev
 
       - name: Add and Sync Android Platform
         run: |
-          npx cap add android || true
+          rm -rf android
+          npx cap add android
           npx cap copy android
           npx cap sync android
 
