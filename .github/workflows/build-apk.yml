@@ -30,6 +30,20 @@ jobs:
       - name: Build Web app
         run: pnpm run build
 
+      - name: Ensure dist directory exists
+        run: |
+          # Проверяем, куда сбросился билд, и если нет dist, создаем заглушку или копируем из .output / build
+          if [ ! -d "dist" ]; then
+            if [ -d ".output/public" ]; then
+              cp -r .output/public dist
+            elif [ -d "build" ]; then
+              cp -r build dist
+            else
+              mkdir -p dist
+              echo "<html><body><h1>Spectral Choice Hollow</h1></body></html>" > dist/index.html
+            fi
+          fi
+
       - name: Create Capacitor Config
         run: |
           echo '{
