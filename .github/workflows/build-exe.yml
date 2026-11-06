@@ -7,7 +7,7 @@ on:
 
 jobs:
   build-win:
-    runs-on: windows-latest  # Собираем прямо на виртуальной машине Windows, чтобы Electron собрался без ошибок
+    runs-on: windows-latest
 
     steps:
       - name: Checkout Repository
@@ -49,7 +49,6 @@ jobs:
               }
             });
 
-            // Загружаем собранный Vite-проект
             win.loadFile(path.join(__dirname, 'dist/index.html'));
           }
 
@@ -66,24 +65,29 @@ jobs:
           "@
           Set-Content -Path main.js -Value $mainJs
 
-      - name: Add Electron Config to package.json
+      - name: Create electron-builder Config (electron-builder.json)
         run: |
-          $pkgPath = "package.json"
-          $json = Get-Content $pkgPath -Raw | ConvertFrom-Json
-          $json.main = "main.js"
-          
-          # Добавляем настройки билда в package.json
-          if (-not $json.build) { $json | Add-Member -NotePropertyName "build" -NotePropertyValue @{
-            appId = "com.spectral.hollow.desktop"
-            productName = "Spectral Choice Hollow"
-            directories = @{ output = "release" }
-            win = @{ target = @("nsis") }
-          } }
-          
-          $json | ConvertTo-Json -Depth 10 | Set-Content $pkgPath
+          $config = @"
+          {
+            "appId": "com.spectral.hollow.desktop",
+            "productName": "Spectral Choice Hollow",
+            "directories": {
+              "output": "release"
+            },
+            "files": [
+              "dist/**/*",
+              "main.js",
+              "package.json"
+            ],
+            "win": {
+              "target": ["nsis"]
+            }
+          }
+          "@
+          Set-Content -Path electron-builder.json -Value $config
 
       - name: Build Windows EXE with Electron-Builder
-        run: npx electron-builder --win
+        run: npx electron-builder --config electron-builder.json
 
       - name: Upload EXE Artifact
         uses: actions/upload-artifact@v4
