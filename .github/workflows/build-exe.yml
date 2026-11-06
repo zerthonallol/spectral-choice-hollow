@@ -31,7 +31,24 @@ jobs:
         run: npm run build
 
       - name: Install Electron & Electron Builder
-        run: npm install electron electron-builder --save-dev
+        run: npm install electron@latest electron-builder@latest --save-dev
+
+      - name: Create Clean package.json for Electron
+        run: |
+          # Создаем полностью чистый и готовый package.json, чтобы builder не ругался на отсутствие полей
+          $pkg = @{
+            name = "spectral-choice-hollow"
+            productName = "Spectral Choice Hollow"
+            version = "1.0.0"
+            description = "Spectral Choice Hollow Desktop App"
+            author = "Developer"
+            main = "main.js"
+            scripts = @{
+              start = "electron ."
+            }
+            dependencies = @{}
+          }
+          $pkg | ConvertTo-Json -Depth 10 | Set-Content -Path package.json -Encoding utf8
 
       - name: Create Electron Main File (main.js)
         run: |
@@ -63,9 +80,9 @@ jobs:
             if (process.platform !== 'darwin') app.quit();
           });
           "@
-          Set-Content -Path main.js -Value $mainJs
+          Set-Content -Path main.js -Value $mainJs -Encoding utf8
 
-      - name: Create electron-builder Config (electron-builder.json)
+      - name: Create electron-builder Config
         run: |
           $config = @"
           {
@@ -80,14 +97,19 @@ jobs:
               "package.json"
             ],
             "win": {
-              "target": ["nsis"]
+              "target": [
+                {
+                  "target": "nsis",
+                  "arch": ["x64"]
+                }
+              ]
             }
           }
           "@
-          Set-Content -Path electron-builder.json -Value $config
+          Set-Content -Path electron-builder.json -Value $config -Encoding utf8
 
       - name: Build Windows EXE with Electron-Builder
-        run: npx electron-builder --config electron-builder.json
+        run: npx electron-builder --config electron-builder.json --publish never
 
       - name: Upload EXE Artifact
         uses: actions/upload-artifact@v4
