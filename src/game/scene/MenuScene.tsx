@@ -59,7 +59,7 @@ function CameraDrift() {
     const t = clock.elapsedTime;
     camera.position.x += (-0.6 + pointer.x * 0.25 + Math.sin(t * 0.2) * 0.1 - camera.position.x) * 0.03;
     camera.position.y += (1.7 + pointer.y * 0.12 - camera.position.y) * 0.03;
-    camera.lookAt(0.2, 2.0, 0);
+    camera.lookAt(0.6, 2.0, 0);
   });
   return null;
 }
@@ -74,15 +74,17 @@ export function MenuScene({ low = false }: { low?: boolean }) {
       onCreated={({ gl, scene }) => {
         gl.toneMapping = THREE.ACESFilmicToneMapping;
         scene.background = new THREE.Color("#050403");
-        scene.fog = new THREE.FogExp2("#060504", 0.12);
+        scene.fog = new THREE.FogExp2("#060504", 0.07);
       }}
     >
-      <ambientLight intensity={0.08} color="#8a7a66" />
+      <ambientLight intensity={0.25} color="#8a7a66" />
+      <pointLight position={[-0.6, 2.4, 1.6]} intensity={5} distance={5} decay={1.5} color="#9fc4e0" />
+      <pointLight position={[0.3, 2.9, 0.4]} intensity={3} distance={2} decay={2} color="#bfe6ff" />
       <spotLight position={[-2, 1, 4]} angle={0.6} penumbra={0.8} intensity={6} color="#7fa8c8" distance={12} />
       <FlickerLamp />
       <Corner />
       {/* Overseer half behind the wall, leaning out to look at you */}
-      <group position={[0.75, 0, -0.3]} rotation-y={-0.35}>
+      <group position={[0.35, 0, -0.35]} rotation-y={-0.3}>
         <Overseer menu />
       </group>
       <CameraDrift />
