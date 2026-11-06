@@ -187,7 +187,10 @@ export type ItemKind =
   | "card"
   | "shard"
   | "nuke"
-  | "battery";
+  | "battery"
+  | "pepper"
+  | "pistol"
+  | "ammo";
 
 export interface Spawn {
   id: number;
@@ -235,6 +238,12 @@ export const SPAWNS: Spawn[] = [
   S("tape", 27, 1, { tape: 4 }),
   S("battery", 22, 5),
   S("battery", 29, 4),
+  S("pepper", 5, 15),
+  S("pepper", 17, 5, { locker: true }),
+  S("pistol", 29, 11, { locker: true }),
+  S("ammo", 9, 9),
+  S("ammo", 20, 13),
+  S("ammo", 25, 1),
 ].map((s, id) => ({ id, ...s }));
 
 // Barrels & crates: dead-end corners, deterministic.

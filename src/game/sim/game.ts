@@ -60,11 +60,25 @@ export const T = {
   NUKE_TIME: 110,
   SEAL_TIME: 14,
   SHORT_TIME: 60,
+  PEPPER_R: 4.2,
+  PEPPER_STUN: 4.5,
+  PISTOL_R: 26,
+  PISTOL_STUN: 5,
+  MONSTER_HP: 3,
+  BROADCAST_TIME: 30,
+  EVENT_MIN: 40,
+  EVENT_MAX: 75,
 };
 
 export type Phase = "menu" | "playing" | "paused" | "reading" | "dead" | "ending";
-export type Slot = "wrench" | "stungun" | "redFlare" | "whiteFlare" | "cortexin" | "bandage" | "shard";
-export const SLOTS: Slot[] = ["wrench", "stungun", "redFlare", "whiteFlare", "cortexin", "bandage", "shard"];
+export type Slot = "wrench" | "stungun" | "pepper" | "pistol" | "redFlare" | "whiteFlare" | "cortexin" | "bandage" | "shard";
+export const SLOTS: Slot[] = ["wrench", "stungun", "pepper", "pistol", "redFlare", "whiteFlare", "cortexin", "bandage", "shard"];
+export type Ending = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+export const ENDING_IDS: Ending[] = [1, 2, 3, 4, 5, 6, 7];
+
+/** Tutorial steps, advanced by the player's own actions. */
+export const TUTORIAL = ["move", "look", "flashlight", "crouch", "pickup", "use"] as const;
+export type TutorialStep = (typeof TUTORIAL)[number];
 
 export type MonsterState = "patrol" | "hunt" | "investigate" | "stunned" | "blind";
 
@@ -85,6 +99,9 @@ export type GameEvent =
   | { type: "inject" }
   | { type: "alarm" }
   | { type: "boom" }
+  | { type: "shot" }
+  | { type: "spray" }
+  | { type: "event"; name: string }
   | { type: "message"; text: string };
 
 export interface Input {
@@ -180,6 +197,8 @@ export class Game {
     cortexin: 0,
     bandage: 0,
     shard: 0,
+    pepper: 0,
+    pistol: 0,
     cards: 0,
     nuke: false,
     tapes: [] as number[],
@@ -213,14 +232,23 @@ export class Game {
     lastSeen: null as Pt | null,
     stride: 0,
     investigateT: 0,
+    wounds: 0,
+    dead: false,
   };
   lightsTimer = 35;
+  broadcastT: number | null = null;
+  eventTimer = 50;
+  blackoutT = 0;
+  blackoutSaved: boolean[] | null = null;
+  tutorial: number | null = null;
+  tutorialMoved = 0;
+  tutorialYaw = 0;
 
   flares: Flare[] = [];
   flareId = 0;
   pickups: Pickup[] = [];
   focus: Focus | null = null;
-  ending: 1 | 2 | 3 | 4 | null = null;
+  ending: Ending | null = null;
   deathReason: string | null = null;
   readingTape: number | null = null;
   messages: { text: string; t: number }[] = [];
@@ -264,6 +292,8 @@ export class Game {
       cortexin: 0,
       bandage: 0,
       shard: 0,
+      pepper: 0,
+      pistol: 0,
       cards: 0,
       nuke: false,
       tapes: [],
@@ -301,8 +331,17 @@ export class Game {
       lastSeen: null,
       stride: 0,
       investigateT: 0,
+      wounds: 0,
+      dead: false,
     });
     this.lightsTimer = 35;
+    this.broadcastT = null;
+    this.eventTimer = 50;
+    this.blackoutT = 0;
+    this.blackoutSaved = null;
+    this.tutorial = null;
+    this.tutorialMoved = 0;
+    this.tutorialYaw = 0;
     this.flares = [];
     this.pickups = SPAWNS.map((sp) => {
       const c = tileCenter(sp.tx, sp.ty);
@@ -358,10 +397,34 @@ export class Game {
     this.emit({ type: "message", text });
   }
 
-  start() {
+  start(tutorial = false) {
     this.reset();
     this.phase = "playing";
+    if (tutorial) {
+      this.tutorial = 0;
+      this.tutorialYaw = this.player.yaw;
+    }
     this.say("Смена №19. Найдите способ выбраться из коллектора.");
+  }
+
+  get tutorialStep(): TutorialStep | null {
+    return this.tutorial === null ? null : TUTORIAL[this.tutorial] ?? null;
+  }
+
+  skipTutorial() {
+    if (this.tutorial === null) return;
+    this.tutorial = null;
+    this.say("Обучение завершено. Удачи, техник.");
+  }
+
+  /** Advance the tutorial when the player has done what the current step asks. */
+  tutorialDone(step: TutorialStep) {
+    if (this.tutorialStep !== step) return;
+    this.tutorial! += 1;
+    if (this.tutorial! >= TUTORIAL.length) {
+      this.tutorial = null;
+      this.say("Обучение завершено. Надсмотрщик проснулся…");
+    }
   }
 
   // ---------- main step ----------
@@ -370,9 +433,14 @@ export class Game {
     this.time += dt;
     this.useCd = Math.max(0, this.useCd - dt);
     this.stepPlayer(dt, input);
-    this.stepLights(dt);
+    this.stepTutorial(dt);
     this.stepFlares(dt);
-    this.stepMonster(dt);
+    // While the tutorial runs, the Overseer and the circuits wait.
+    if (this.tutorial === null) {
+      this.stepLights(dt);
+      this.stepEvents(dt);
+      if (!this.monster.dead) this.stepMonster(dt);
+    }
     this.stepStatus(dt);
     this.stepTimers(dt);
     this.updateFocus();
@@ -421,6 +489,94 @@ export class Game {
     p.noise = Math.max(noise, p.noiseImpulse);
   }
 
+  private stepTutorial(dt: number) {
+    if (this.tutorial === null) return;
+    const p = this.player;
+    this.tutorialMoved += p.speed * dt;
+    if (this.tutorialMoved > 3) this.tutorialDone("move");
+    let d = p.yaw - this.tutorialYaw;
+    d = Math.atan2(Math.sin(d), Math.cos(d));
+    if (Math.abs(d) > 1.2) this.tutorialDone("look");
+    if (p.flashlight) this.tutorialDone("flashlight");
+    if (p.crouch && p.speed > 0.3) this.tutorialDone("crouch");
+  }
+
+  /** Random incidents that keep each shift different. */
+  private stepEvents(dt: number) {
+    if (this.blackoutT > 0) {
+      this.blackoutT -= dt;
+      if (this.blackoutT <= 0 && this.blackoutSaved) {
+        this.blackoutSaved.forEach((lit, i) => this.setSector(i, lit));
+        this.blackoutSaved = null;
+        this.say("Напряжение восстановлено.");
+      }
+    }
+    this.eventTimer -= dt;
+    if (this.eventTimer > 0) return;
+    this.eventTimer = T.EVENT_MIN + this.rng() * (T.EVENT_MAX - T.EVENT_MIN);
+    this.triggerEvent(Math.floor(this.rng() * 5));
+  }
+
+  triggerEvent(n: number) {
+    const p = this.player;
+    const m = this.monster;
+    switch (n) {
+      case 0: {
+        if (this.blackoutSaved) return;
+        this.blackoutSaved = this.sectors.map((s) => s.lit);
+        this.sectors.forEach((_, i) => this.setSector(i, false));
+        this.blackoutT = 9;
+        this.emit({ type: "event", name: "blackout" });
+        this.say("Скачок напряжения! Весь коллектор во тьме.");
+        break;
+      }
+      case 1: {
+        // Supply cache dropped down a service shaft near the player.
+        const kinds: ItemKind[] = ["battery", "bandage", "whiteFlare", "ammo", "pepper"];
+        const kind = kinds[Math.floor(this.rng() * kinds.length)];
+        const { tx, ty } = worldToTile(p.x, p.z);
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [0, 0]]) {
+          if (this.solid(tx + dx, ty + dy)) continue;
+          const c = tileCenter(tx + dx, ty + dy);
+          this.pickups.push({ id: this.pickups.length, kind, x: c.x, z: c.z, tx: tx + dx, ty: ty + dy, taken: false, locker: false, opened: true });
+          break;
+        }
+        this.emit({ type: "event", name: "cache" });
+        this.say("Из вентшахты что-то упало рядом. Посмотрите вокруг.");
+        break;
+      }
+      case 2:
+        // A pipe bursts: loud, and the Overseer comes to look.
+        p.noiseImpulse = 16;
+        m.state = "investigate";
+        m.lastSeen = { x: p.x, z: p.z };
+        m.investigateT = 4;
+        this.emit({ type: "event", name: "pipe" });
+        this.say("Рядом лопнула труба! Грохот разнёсся по тоннелям.");
+        break;
+      case 3: {
+        // Fake footsteps behind the player.
+        const f = forwardOf(p.yaw);
+        this.emit({ type: "mstep", x: p.x - f.x * 4, z: p.z - f.z * 4, dark: true });
+        this.emit({ type: "mstep", x: p.x - f.x * 3, z: p.z - f.z * 3, dark: true });
+        p.sanity -= 6;
+        this.say(p.sanity < 50 ? "За спиной шаги. Там никого нет… правда?" : "Вы слышите шаги позади.");
+        break;
+      }
+      default:
+        // Old radio crackles: a hint
+        this.emit({ type: "event", name: "radio" });
+        this.say(
+          this.inv.tapes.length >= 5
+            ? "Рация: «…консоль реактора может передать записи наверх…»"
+            : this.rng() < 0.5
+              ? "Рация: «…патроны к ПМ в оружейке у реки… шкафчик на востоке…»"
+              : "Рация: «…перцовка жжёт ему глаза… вблизи…»",
+        );
+        break;
+    }
+  }
+
   private stepLights(dt: number) {
     for (const s of this.sectors) s.flickerT = Math.max(0, s.flickerT - dt);
     for (let i = 0; i < this.sectors.length; i++) {
@@ -431,7 +587,7 @@ export class Game {
       }
     }
     this.lightsTimer -= dt;
-    if (this.lightsTimer > 0) return;
+    if (this.lightsTimer > 0 || this.blackoutSaved) return;
     this.lightsTimer = T.LIGHTS_MIN + this.rng() * (T.LIGHTS_MAX - T.LIGHTS_MIN);
     // The Overseer rewires a circuit near the player.
     const { tx, ty } = worldToTile(this.player.x, this.player.z);
@@ -682,6 +838,21 @@ export class Game {
         return;
       }
     }
+    if (this.broadcastT !== null) {
+      this.broadcastT -= dt;
+      // the transmitter is loud: the Overseer homes in
+      const m = this.monster;
+      if (!m.dead && m.stunT <= 0) {
+        m.state = "investigate";
+        m.lastSeen = { x: p.x, z: p.z };
+        m.investigateT = 2;
+      }
+      if (this.broadcastT <= 0) {
+        this.broadcastT = null;
+        this.finish(6);
+        return;
+      }
+    }
     if (this.nukeArmedT !== null) {
       this.nukeArmedT -= dt;
       const d = tileCenter(POI.drain.tx, POI.drain.ty);
@@ -704,7 +875,7 @@ export class Game {
     this.deathReason = reason;
   }
 
-  finish(ending: 1 | 2 | 3 | 4) {
+  finish(ending: Ending) {
     if (this.phase !== "playing") return;
     this.phase = "ending";
     this.ending = ending;
@@ -775,12 +946,17 @@ export class Game {
     }
     {
       const c = tileCenter(POI.reactor.tx, POI.reactor.ty);
-      const ok = this.inv.nuke && !this.nukePlanted;
+      const canBroadcast = this.inv.tapes.length >= 5 && this.broadcastT === null && !this.inv.nuke;
+      const ok = (this.inv.nuke && !this.nukePlanted) || canBroadcast;
       const label = this.nukePlanted
         ? "Заряд взведён. Бегите к дренажу на западе!"
-        : ok
-          ? "Установить и взвести термоядерный заряд"
-          : "Консоль реактора. Нужен термоядерный заряд";
+        : this.broadcastT !== null
+          ? "Передача идёт… держитесь!"
+          : this.inv.nuke
+            ? "Установить и взвести термоядерный заряд"
+            : canBroadcast
+              ? "Передать все 5 плёнок наверх по аварийному каналу"
+              : "Консоль реактора. Нужен заряд — или все 5 плёнок";
       consider({ kind: "reactor", ref: 0, label, ok }, c.x, c.z);
     }
     {
@@ -799,12 +975,18 @@ export class Game {
     }
     {
       const c = tileCenter(POI.drain.tx, POI.drain.ty);
+      const armed = this.nukeArmedT !== null;
+      const shoot = !armed && this.inv.pistol > 0;
       consider(
         {
           kind: "drain",
           ref: 0,
-          label: this.nukeArmedT !== null ? "Прыгнуть в дренаж!" : "Дренажный сток к реке. Решётка заварена",
-          ok: this.nukeArmedT !== null,
+          label: armed
+            ? "Прыгнуть в дренаж!"
+            : shoot
+              ? "Сбить замок решётки выстрелом и уйти по реке"
+              : "Дренажный сток к реке. Решётка заварена (замок можно отстрелить)",
+          ok: armed || shoot,
         },
         c.x - 1,
         c.z,
@@ -866,6 +1048,13 @@ export class Game {
         }
         break;
       case "reactor":
+        if (!this.inv.nuke) {
+          this.broadcastT = T.BROADCAST_TIME;
+          this.emit({ type: "terminal" });
+          this.emit({ type: "alarm" });
+          this.say("Передача началась! Продержитесь 30 секунд — он слышит сигнал.");
+          break;
+        }
         this.nukePlanted = true;
         this.inv.nuke = false;
         this.nukeArmedT = T.NUKE_TIME;
@@ -879,8 +1068,14 @@ export class Game {
         this.finish(3);
         break;
       case "drain":
-        this.emit({ type: "boom" });
-        this.finish(2);
+        if (this.nukeArmedT !== null) {
+          this.emit({ type: "boom" });
+          this.finish(2);
+        } else {
+          this.inv.pistol -= 1;
+          this.emit({ type: "shot" });
+          this.finish(7);
+        }
         break;
       case "panel": {
         const lit = !this.sectors[f.ref].lit;
@@ -928,6 +1123,17 @@ export class Game {
       case "battery":
         this.player.battery = Math.min(100, this.player.battery + T.BATTERY_PACK);
         break;
+      case "pepper":
+        inv.pepper += 3;
+        this.selected = "pepper";
+        break;
+      case "pistol":
+        inv.pistol += 2;
+        this.selected = "pistol";
+        break;
+      case "ammo":
+        inv.pistol += 2;
+        break;
       case "tape":
         if (pk.tape !== undefined) {
           inv.tapes.push(pk.tape);
@@ -937,6 +1143,7 @@ export class Game {
         break;
     }
     this.emit({ type: "pickup", kind: pk.kind });
+    this.tutorialDone("pickup");
     const extra = pk.kind === "card" ? ` (${inv.cards}/3)` : pk.kind === "shard" ? ` (${inv.shard}/3)` : "";
     this.say("Найдено: " + ITEM_INFO[pk.kind].name + extra);
   }
@@ -981,7 +1188,47 @@ export class Game {
     const dz = m.z - p.z;
     const d = Math.hypot(dx, dz);
     const dot = d > 0 ? (dx * f.x + dz * f.z) / d : 1;
+    this.tutorialDone("use");
     switch (slot) {
+      case "pepper":
+        this.useCd = 0.9;
+        this.inv.pepper -= 1;
+        p.noiseImpulse = 3;
+        this.emit({ type: "spray" });
+        if (!m.dead && d < T.PEPPER_R && dot > 0.6) {
+          m.stunT = T.PEPPER_STUN;
+          m.state = "blind";
+          m.lastSeen = null;
+          this.say("Перцовка в экран! Надсмотрщик воет и мечется.");
+        } else this.say("Облако перца рассеялось в воздухе.");
+        break;
+      case "pistol": {
+        this.useCd = 0.7;
+        this.inv.pistol -= 1;
+        p.noiseImpulse = 22;
+        this.emit({ type: "shot" });
+        if (!m.dead && d < T.PISTOL_R && dot > 0.93 && lineOfSight(p, m, this.solid)) {
+          m.wounds += 1;
+          if (m.wounds >= T.MONSTER_HP) {
+            m.dead = true;
+            m.stunT = 999;
+            m.state = "stunned";
+            m.speed = 0;
+            this.say("Последний выстрел. Экран Надсмотрщика гаснет навсегда.");
+            this.finish(5);
+          } else {
+            m.stunT = T.PISTOL_STUN;
+            m.state = "stunned";
+            this.say(`Попадание! (${m.wounds}/${T.MONSTER_HP}) Он шатается — но встаёт.`);
+          }
+        } else {
+          m.state = "investigate";
+          m.lastSeen = { x: p.x, z: p.z };
+          m.investigateT = 5;
+          this.say("Промах! Эхо выстрела разнеслось по коллектору.");
+        }
+        break;
+      }
       case "wrench":
         this.useCd = 1.0;
         p.noiseImpulse = 8;
