@@ -161,3 +161,55 @@ describe("overseer", () => {
     expect(g.monster.stunT).toBeGreaterThan(0);
   });
 });
+
+describe("new items, endings and tutorial", () => {
+  const near = (g: Game, dist = 3) => {
+    g.monster.x = g.player.x;
+    g.monster.z = g.player.z - dist; // straight ahead at yaw 0
+    g.player.yaw = 0;
+  };
+  it("pepper spray stuns at close range and uses a charge", () => {
+    const g = new Game();
+    g.start();
+    g.inv.pepper = 3;
+    g.selected = "pepper";
+    near(g, 3);
+    g.useItem();
+    expect(g.monster.stunT).toBeGreaterThan(0);
+    expect(g.inv.pepper).toBe(2);
+  });
+  it("three pistol hits kill the Overseer: ending 5", () => {
+    const g = new Game();
+    g.start();
+    g.inv.pistol = 3;
+    g.selected = "pistol";
+    for (let i = 0; i < 3; i++) {
+      near(g, 4);
+      g.useCd = 0;
+      g.useItem();
+    }
+    expect(g.ending).toBe(5);
+  });
+  it("broadcasting all five tapes and surviving 30 s: ending 6", () => {
+    const g = new Game();
+    g.start();
+    g.inv.tapes = [0, 1, 2, 3, 4];
+    const c = tileCenter(POI.reactor.tx, POI.reactor.ty);
+    g.player.x = c.x;
+    g.player.z = c.z;
+    g.interact();
+    expect(g.broadcastT).toBe(30);
+    g.monster.dead = true;
+    for (let i = 0; i < 31 * 20 && g.phase === "playing"; i++) g.step(0.05, { fwd: 0, strafe: 0, run: false, crouch: false, yaw: 0, pitch: 0 });
+    expect(g.ending).toBe(6);
+  });
+  it("tutorial freezes the Overseer until finished", () => {
+    const g = new Game();
+    g.start(true);
+    const mx = g.monster.x;
+    for (let i = 0; i < 100; i++) g.step(0.05, { fwd: 0, strafe: 0, run: false, crouch: false, yaw: 0, pitch: 0 });
+    expect(g.monster.x).toBe(mx);
+    g.skipTutorial();
+    expect(g.tutorial).toBeNull();
+  });
+});

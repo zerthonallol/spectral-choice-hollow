@@ -239,9 +239,9 @@ export const SPAWNS: Spawn[] = [
   S("battery", 22, 5),
   S("battery", 29, 4),
   S("pepper", 5, 15),
-  S("pepper", 17, 5, { locker: true }),
+  S("pepper", 16, 5, { locker: true }),
   S("pistol", 29, 11, { locker: true }),
-  S("ammo", 9, 9),
+  S("ammo", 8, 9),
   S("ammo", 20, 13),
   S("ammo", 25, 1),
 ].map((s, id) => ({ id, ...s }));
