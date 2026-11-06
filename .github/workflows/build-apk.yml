@@ -18,11 +18,17 @@ jobs:
         with:
           node-version: 22
 
-      - name: Install dependencies
-        run: npm install
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: latest
+          run_install: false
+
+      - name: Install dependencies with pnpm
+        run: pnpm install --shamefully-hoist
 
       - name: Build Web app
-        run: npm run build
+        run: pnpm run build
 
       - name: Create Capacitor Config
         run: |
@@ -34,7 +40,7 @@ jobs:
 
       - name: Install Capacitor packages
         run: |
-          npm install @capacitor/core @capacitor/cli @capacitor/android
+          pnpm add @capacitor/core @capacitor/cli @capacitor/android
 
       - name: Add Android Platform with Capacitor
         run: |
