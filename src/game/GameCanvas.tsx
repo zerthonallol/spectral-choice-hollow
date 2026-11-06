@@ -1,4 +1,5 @@
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { PerformanceMonitor } from "@react-three/drei";
 import { EffectComposer, Vignette, ChromaticAberration, Noise } from "@react-three/postprocessing";
 import { BlendFunction, type ChromaticAberrationEffect } from "postprocessing";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -84,7 +85,7 @@ function Post() {
   );
 }
 
-export function GameCanvas() {
+export function GameCanvas({ active = true }: { active?: boolean }) {
   const [low, setLow] = useState(() => {
     loadSettings();
     return settings.lowSpec;
@@ -94,12 +95,15 @@ export function GameCanvas() {
     window.addEventListener(SETTINGS_EVENT, on);
     return () => window.removeEventListener(SETTINGS_EVENT, on);
   }, []);
+  const [dpr, setDpr] = useState(low ? 0.6 : 1.25);
+  useEffect(() => setDpr(low ? 0.6 : 1.25), [low]);
   return (
     <Canvas
       key={low ? "low" : "high"}
+      frameloop={active ? "always" : "never"}
       shadows={!low}
-      dpr={low ? 0.6 : [1, 1.5]}
-      camera={{ fov: 72, near: 0.05, far: 80 }}
+      dpr={dpr}
+      camera={{ fov: 72, near: 0.05, far: low ? 45 : 80 }}
       gl={{ antialias: false, powerPreference: "high-performance", precision: low ? "mediump" : "highp" }}
       onCreated={({ gl, scene }) => {
         gl.toneMapping = THREE.ACESFilmicToneMapping;
@@ -113,7 +117,12 @@ export function GameCanvas() {
       <PlayerRig />
       <Level />
       <Lamps />
-      <LightPool />
+      {/* Lower resolution automatically when the frame rate drops. */}
+      <PerformanceMonitor
+        onDecline={() => setDpr((d) => Math.max(0.5, d - 0.15))}
+        onIncline={() => setDpr((d) => Math.min(low ? 0.8 : 1.5, d + 0.1))}
+      />
+      <LightPool low={low} />
       <Pipes />
       <Clutter />
       <Panels />

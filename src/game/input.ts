@@ -22,10 +22,38 @@ export const settings = {
 export const SETTINGS_EVENT = "game-settings-change";
 
 const KEY = "light-codes-settings";
+const TUT_KEY = "light-codes-tutorial-done";
+
+/** Rough guess whether this is a phone or a weak laptop. */
+export function isWeakDevice() {
+  if (typeof navigator === "undefined") return false;
+  const nav = navigator as Navigator & { deviceMemory?: number };
+  const cores = nav.hardwareConcurrency ?? 8;
+  const mem = nav.deviceMemory ?? 8;
+  const coarse = typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches;
+  return coarse || cores <= 4 || mem <= 4;
+}
+
+export function tutorialSeen() {
+  try {
+    return localStorage.getItem(TUT_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+export function markTutorialSeen() {
+  try {
+    localStorage.setItem(TUT_KEY, "1");
+  } catch {
+    /* ignore */
+  }
+}
+
 export function loadSettings() {
   try {
     const raw = localStorage.getItem(KEY);
     if (raw) Object.assign(settings, JSON.parse(raw));
+    else settings.lowSpec = isWeakDevice();
   } catch {
     /* ignore */
   }

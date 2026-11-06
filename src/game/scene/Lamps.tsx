@@ -77,7 +77,8 @@ interface Slot {
 }
 
 /** A fixed pool of real lights that follows the nearest active lamps and flares. */
-export function LightPool() {
+export function LightPool({ low = false }: { low?: boolean }) {
+  const pool = low ? 2 : POOL;
   const group = useRef<THREE.Group>(null!);
   const spot = useRef<THREE.SpotLight>(null!);
   const spotTarget = useMemo(() => new THREE.Object3D(), []);
@@ -87,7 +88,7 @@ export function LightPool() {
 
   useLayoutEffect(() => {
     slots.current = [];
-    for (let i = 0; i < POOL; i++) {
+    for (let i = 0; i < pool; i++) {
       const light = new THREE.PointLight("#ffb050", 0, 11, 2);
       group.current.add(light);
       slots.current.push({ light, lamp: -1, fade: 0 });
@@ -96,7 +97,7 @@ export function LightPool() {
     return () => {
       slots.current.forEach((s) => s.light.dispose());
     };
-  }, [spotTarget]);
+  }, [spotTarget, pool]);
 
   useFrame((state, delta) => {
     const t = state.clock.elapsedTime;
@@ -123,7 +124,7 @@ export function LightPool() {
       cands.push({ key: l.i, x: l.x, y: LAMP_Y - 0.15, z: l.z, d, col: LAMP_COLOR[l.kind], power: 16 });
     }
     cands.sort((a, b) => a.d - b.d);
-    const chosen = cands.slice(0, POOL);
+    const chosen = cands.slice(0, pool);
     const keys = new Set(chosen.map((c) => c.key));
     // release slots whose lamp left the set
     for (const s of slots.current) if (!keys.has(s.lamp)) s.lamp = -1;
@@ -180,9 +181,9 @@ export function LightPool() {
         distance={13}
         decay={1.6}
         intensity={0}
-        castShadow
-        shadow-mapSize-width={1024}
-        shadow-mapSize-height={1024}
+        castShadow={!low}
+        shadow-mapSize-width={low ? 256 : 1024}
+        shadow-mapSize-height={low ? 256 : 1024}
         shadow-bias={-0.0004}
         shadow-normalBias={0.03}
         shadow-camera-near={0.3}
