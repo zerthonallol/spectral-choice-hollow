@@ -103,6 +103,7 @@ export function Hud() {
         return;
       }
       if (game.phase !== "playing") return;
+      if (e.code === "Enter") game.skipTutorial();
       if (e.code === "KeyF") game.toggleFlashlight();
       if (e.code === "KeyE") game.interact();
       if (e.code === "KeyQ") game.cycle(-1);
@@ -163,9 +164,7 @@ export function Hud() {
   useEffect(() => {
     if (s.phase === "ending" && s.ending) saveEnding(s.ending);
   }, [s.phase, s.ending]);
-  useEffect(() => {
-    if (s.tutorialIndex === null && s.phase === "playing") return;
-  }, [s.tutorialIndex, s.phase]);
+
 
   return (
     <div className="pointer-events-none absolute inset-0 select-none font-mono text-hud">
@@ -409,7 +408,7 @@ function TutorialCard({ step, index, touch }: { step: string; index: number; tou
           <div className="h-full bg-primary transition-all" style={{ width: `${(index / 6) * 100}%` }} />
         </div>
         <button className="hud-btn pointer-events-auto mt-2 px-2 py-0.5 text-[10px]" onClick={() => game.skipTutorial()}>
-          Пропустить обучение
+          Пропустить обучение{touch ? "" : " [Enter]"}
         </button>
       </div>
     </div>

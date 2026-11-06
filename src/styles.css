@@ -195,5 +195,19 @@
     background: oklch(0 0 0 / 50%); border: 1px solid var(--border); color: var(--hud); }
   .touch-btn-on { background: oklch(0.78 0.15 70 / 40%); border-color: var(--primary); }
 }
+@layer components {
+  .menu-shade { pointer-events: none;
+    background: linear-gradient(90deg, oklch(0.04 0.005 60 / 92%) 0%, oklch(0.05 0.005 60 / 70%) 38%, oklch(0 0 0 / 0%) 70%),
+      radial-gradient(ellipse at 70% 50%, oklch(0 0 0 / 0%) 30%, oklch(0.03 0 0 / 70%) 100%); }
+  .menu-title { font-family: var(--font-display); font-size: clamp(3rem, 9vw, 6.5rem); letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--primary); line-height: 0.9; text-shadow: 0 0 40px oklch(0.78 0.15 70 / 45%); }
+  .menu-rise { opacity: 0; animation: menu-rise 0.9s cubic-bezier(.2,.7,.2,1) forwards; }
+  .menu-fade-in { animation: menu-fade 2.4s ease-out both; }
+  .menu-item { text-align: left; transition: transform 0.2s ease, letter-spacing 0.2s ease, filter 0.2s; }
+  .menu-item:hover { transform: translateX(8px); letter-spacing: 0.04em; }
+  .tutorial-card { animation: hud-in 0.4s ease-out both; border-color: var(--primary); }
+}
+@keyframes menu-rise { from { opacity: 0; transform: translateY(14px); filter: blur(4px); } to { opacity: 1; transform: none; filter: none; } }
+@keyframes menu-fade { 0% { opacity: 0; } 30% { opacity: 0.2; } 34% { opacity: 0; } 40% { opacity: 0.6; } 100% { opacity: 1; } }
 @keyframes hud-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 @keyframes flicker { 0%, 92%, 100% { opacity: 1; } 93% { opacity: 0.3; } 94% { opacity: 1; } 96% { opacity: 0.5; } 97% { opacity: 1; } }
