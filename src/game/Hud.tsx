@@ -1,7 +1,18 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { game, SLOTS } from "./sim/game";
+import { game, SLOTS, ENDING_IDS, type Ending } from "./sim/game";
+import { MenuScene } from "./scene/MenuScene";
 import { ITEM_INFO, TAPES, ENDINGS, DEATHS } from "./sim/lore";
-import { input, look, settings, saveSettings, loadSettings, isTouchMode, SETTINGS_EVENT } from "./input";
+import {
+  input,
+  look,
+  settings,
+  saveSettings,
+  loadSettings,
+  isTouchMode,
+  SETTINGS_EVENT,
+  tutorialSeen,
+  markTutorialSeen,
+} from "./input";
 import { audio } from "./audio";
 import { ITEM_ART } from "./itemArt";
 
@@ -26,6 +37,11 @@ function snapshot() {
     nukeT: game.nukeArmedT,
     sealT: game.sealT,
     projecting: game.monster.projecting,
+    broadcastT: game.broadcastT,
+    blackout: game.blackoutT > 0,
+    tutorial: game.tutorialStep,
+    tutorialIndex: game.tutorial,
+    wounds: game.monster.wounds,
   };
 }
 type Snap = ReturnType<typeof snapshot>;
@@ -35,9 +51,27 @@ const lock = () => {
   if (!isTouchMode()) void canvasEl()?.requestPointerLock?.();
 };
 
-async function startGame() {
+const ENDINGS_KEY = "light-codes-endings";
+function loadEndings(): Ending[] {
+  try {
+    return JSON.parse(localStorage.getItem(ENDINGS_KEY) ?? "[]");
+  } catch {
+    return [];
+  }
+}
+function saveEnding(e: Ending) {
+  const all = loadEndings();
+  if (all.includes(e)) return;
+  try {
+    localStorage.setItem(ENDINGS_KEY, JSON.stringify([...all, e]));
+  } catch {
+    /* ignore */
+  }
+}
+
+async function startGame(tutorial = false) {
   await audio.init();
-  game.start();
+  game.start(tutorial);
   input.yaw = game.player.yaw;
   input.pitch = 0;
   lock();
@@ -126,6 +160,13 @@ export function Hud() {
 
   const insanity = Math.max(0, 1 - s.sanity / 100);
 
+  useEffect(() => {
+    if (s.phase === "ending" && s.ending) saveEnding(s.ending);
+  }, [s.phase, s.ending]);
+  useEffect(() => {
+    if (s.tutorialIndex === null && s.phase === "playing") return;
+  }, [s.tutorialIndex, s.phase]);
+
   return (
     <div className="pointer-events-none absolute inset-0 select-none font-mono text-hud">
       <div className="crt-overlay" style={{ opacity: 0.55 + insanity * 0.45 }} />
@@ -142,6 +183,8 @@ export function Hud() {
           <div className="absolute right-4 top-4 flex flex-col items-end gap-1 text-right">
             {s.nukeT !== null && <div className="hud-alert">ЗАРЯД: {Math.ceil(s.nukeT)} с</div>}
             {s.sealT !== null && <div className="hud-alert">ГЕРМЕТИЗАЦИЯ: {Math.ceil(s.sealT)} с</div>}
+            {s.broadcastT !== null && <div className="hud-alert">ПЕРЕДАЧА: {Math.ceil(s.broadcastT)} с</div>}
+            {s.blackout && <div className="hud-alert">ОБЕСТОЧЕНО</div>}
             <div className="text-xs text-hud-dim">
               Перфокарты {s.cards}/3 · Плёнки {s.tapes.length}/{TAPES.length}
             </div>
@@ -190,7 +233,7 @@ export function Hud() {
               <br />
               ЛКМ/Пробел — предмет · E/ПКМ — действие · F — фонарь
               <br />
-              1–7 / колесо — выбор · Tab — инвентарь · Esc — пауза
+              1–9 / колесо — выбор · Tab — инвентарь · Esc — пауза
             </div>
           )}
           <button
@@ -202,6 +245,7 @@ export function Hud() {
         </>
       )}
 
+      {s.phase === "playing" && s.tutorial && <TutorialCard step={s.tutorial} index={s.tutorialIndex ?? 0} touch={touch} />}
       {showInv && s.phase !== "menu" && <Inventory s={s} onClose={() => setShowInv(false)} />}
       {touch && s.phase === "playing" && <TouchControls flashlight={s.flashlight} />}
 
@@ -226,8 +270,8 @@ export function Hud() {
       {s.phase === "ending" && s.ending && (
         <Screen title={ENDINGS[s.ending].title} subtitle={ENDINGS[s.ending].subtitle}>
           <p className="max-w-xl text-center leading-relaxed text-hud">{ENDINGS[s.ending].text}</p>
-          <div className="flex gap-2 text-xs text-hud-dim">
-            {([1, 2, 3, 4] as const).map((n) => (
+          <div className="flex max-w-xl flex-wrap justify-center gap-x-3 gap-y-1 text-xs text-hud-dim">
+            {ENDING_IDS.map((n) => (
               <span key={n} className={n === s.ending ? "text-primary" : ""}>{ENDINGS[n].title}</span>
             ))}
           </div>
@@ -265,26 +309,109 @@ function Screen({ title, subtitle, tone, children }: { title: string; subtitle?:
 }
 
 function MainMenu({ onTouch }: { onTouch: (v: boolean) => void }) {
-  const [tab, setTab] = useState<"main" | "settings">("main");
+  const [tab, setTab] = useState<"main" | "settings" | "endings">("main");
+  const [endings, setEndings] = useState<Ending[]>([]);
+  const [firstTime, setFirstTime] = useState(false);
+  useEffect(() => {
+    setEndings(loadEndings());
+    setFirstTime(!tutorialSeen());
+  }, []);
+  const begin = (tut: boolean) => {
+    markTutorialSeen();
+    void startGame(tut);
+  };
   return (
-    <div className="hud-screen pointer-events-auto absolute inset-0 flex flex-col items-center justify-center gap-5 p-6">
-      <div className="text-xs uppercase tracking-[0.4em] text-hud-dim">Коллектор «Б» · Смена №19</div>
-      <h1 className="hud-title hud-flicker">Световой Код</h1>
-      <p className="max-w-md text-center text-sm text-hud-dim">
-        Свет — единственное, что держит Надсмотрщика на расстоянии. Не смотрите в его экран.
-      </p>
-      {tab === "main" ? (
-        <div className="flex w-64 flex-col gap-2">
-          <button className="hud-btn-primary" onClick={() => void startGame()}>Начать смену</button>
-          <button className="hud-btn" onClick={() => setTab("settings")}>Настройки и управление</button>
+    <div className="pointer-events-auto absolute inset-0 overflow-hidden">
+      <div className="absolute inset-0 menu-fade-in">
+        <MenuScene low={settings.lowSpec} />
+      </div>
+      <div className="menu-shade absolute inset-0" />
+      <div className="relative flex h-full flex-col justify-center gap-5 p-8 sm:p-14 md:w-[52%]">
+        <div className="menu-rise text-xs uppercase tracking-[0.4em] text-hud-dim" style={{ animationDelay: "0.2s" }}>
+          Коллектор «Б» · Смена №19
         </div>
-      ) : (
-        <div className="flex w-72 flex-col gap-3">
-          <SettingsPanel onTouch={onTouch} />
-          <button className="hud-btn" onClick={() => setTab("main")}>Назад</button>
+        <h1 className="menu-rise menu-title hud-flicker" style={{ animationDelay: "0.4s" }}>
+          Световой
+          <br />
+          Код
+        </h1>
+        <p className="menu-rise max-w-sm text-sm text-hud-dim" style={{ animationDelay: "0.6s" }}>
+          Свет — единственное, что держит Надсмотрщика на расстоянии. Не смотрите в его экран.
+        </p>
+        {tab === "main" && (
+          <div className="flex w-72 flex-col gap-2">
+            {[
+              { label: firstTime ? "Начать смену (с обучением)" : "Начать смену", primary: true, on: () => begin(firstTime) },
+              { label: "Обучение", on: () => begin(true) },
+              { label: `Концовки ${endings.length}/${ENDING_IDS.length}`, on: () => setTab("endings") },
+              { label: "Настройки и управление", on: () => setTab("settings") },
+            ].map((b, i) => (
+              <button
+                key={b.label}
+                className={`menu-rise menu-item ${b.primary ? "hud-btn-primary" : "hud-btn"}`}
+                style={{ animationDelay: `${0.8 + i * 0.1}s` }}
+                onClick={b.on}
+              >
+                {b.label}
+              </button>
+            ))}
+          </div>
+        )}
+        {tab === "settings" && (
+          <div className="menu-rise flex w-72 flex-col gap-3">
+            <SettingsPanel onTouch={onTouch} />
+            <button className="hud-btn" onClick={() => setTab("main")}>Назад</button>
+          </div>
+        )}
+        {tab === "endings" && (
+          <div className="menu-rise flex w-80 flex-col gap-2">
+            <div className="hud-panel flex flex-col gap-1.5 text-xs">
+              {ENDING_IDS.map((n) => {
+                const open = endings.includes(n);
+                return (
+                  <div key={n} className="flex justify-between gap-2 border-t border-border/40 pt-1.5 first:border-0 first:pt-0">
+                    <span className={open ? "text-primary" : "text-hud-dim"}>{open ? ENDINGS[n].title : "???"}</span>
+                    <span className="text-hud-dim">{ENDINGS[n].subtitle.split("·")[0]}</span>
+                  </div>
+                );
+              })}
+            </div>
+            <button className="hud-btn" onClick={() => setTab("main")}>Назад</button>
+          </div>
+        )}
+        <p className="menu-rise text-[10px] text-hud-dim" style={{ animationDelay: "1.3s" }}>
+          Лучше в наушниках. Он смотрит.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+const TUTORIAL_TEXT: Record<string, { desk: string; touch: string }> = {
+  move: { desk: "Идите: W A S D", touch: "Двигайтесь левым джойстиком" },
+  look: { desk: "Осмотритесь мышью по сторонам", touch: "Ведите пальцем по правой части экрана" },
+  flashlight: { desk: "Включите фонарь: F. Он садит батарею — и выдаёт вас", touch: "Включите фонарь кнопкой" },
+  crouch: { desk: "Пройдите пригнувшись: C — так тише", touch: "Пригнитесь и пройдите немного" },
+  pickup: { desk: "Подойдите к предмету рядом и нажмите E", touch: "Подойдите к предмету и нажмите «Действие»" },
+  use: { desk: "Используйте предмет: ЛКМ или Пробел (выбор — 1–9)", touch: "Нажмите «Предмет», чтобы использовать" },
+};
+
+function TutorialCard({ step, index, touch }: { step: string; index: number; touch: boolean }) {
+  const t = TUTORIAL_TEXT[step];
+  return (
+    <div className="absolute left-1/2 top-20 w-[min(90vw,420px)] -translate-x-1/2">
+      <div key={step} className="hud-panel tutorial-card text-center">
+        <div className="mb-1 text-[10px] uppercase tracking-[0.3em] text-hud-dim">
+          Обучение · {index + 1}/{Object.keys(TUTORIAL_TEXT).length}
         </div>
-      )}
-      <p className="text-[10px] text-hud-dim">Лучше в наушниках.</p>
+        <div className="text-sm text-primary">{touch ? t?.touch : t?.desk}</div>
+        <div className="mt-2 h-1 bg-border/40">
+          <div className="h-full bg-primary transition-all" style={{ width: `${(index / 6) * 100}%` }} />
+        </div>
+        <button className="hud-btn pointer-events-auto mt-2 px-2 py-0.5 text-[10px]" onClick={() => game.skipTutorial()}>
+          Пропустить обучение
+        </button>
+      </div>
     </div>
   );
 }
